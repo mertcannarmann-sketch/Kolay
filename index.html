@@ -1,0 +1,1279 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Vertical">
+<title>Vertical — Suunto Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Epilogue:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   TOKENS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+:root {
+  --ink:       #07090C;
+  --ink2:      #0D1117;
+  --ink3:      #131920;
+  --glass:     rgba(255,255,255,0.042);
+  --glass2:    rgba(255,255,255,0.072);
+  --rim:       rgba(255,255,255,0.072);
+  --rim2:      rgba(255,255,255,0.13);
+  --snow:      #E8EDF4;
+  --snow2:     rgba(232,237,244,0.52);
+  --snow3:     rgba(232,237,244,0.26);
+  --snow4:     rgba(232,237,244,0.12);
+  --c1: #00FFCC;   /* teal */
+  --c2: #FF3E6C;   /* red */
+  --c3: #FFAD1F;   /* amber */
+  --c4: #4F8EF7;   /* blue */
+  --c5: #B57BFF;   /* violet */
+  --c6: #3DD68C;   /* green */
+  --safe-t: env(safe-area-inset-top,  47px);
+  --safe-b: env(safe-area-inset-bottom, 34px);
+  --r: 22px; --r2: 16px; --r3: 11px;
+}
+
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--ink);color:var(--snow);
+  font-family:'Epilogue',sans-serif;-webkit-font-smoothing:antialiased;}
+
+/* noise grain */
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:1;opacity:0.018;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");}
+
+/* ambient orbs */
+.orbs{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;}
+.orb{position:absolute;border-radius:50%;filter:blur(100px);opacity:0.07;}
+.orb1{width:380px;height:380px;background:var(--c1);top:-160px;left:-100px;animation:drift 24s ease-in-out infinite;}
+.orb2{width:280px;height:280px;background:var(--c2);bottom:-100px;right:-80px;animation:drift 24s ease-in-out infinite -9s;}
+.orb3{width:220px;height:220px;background:var(--c3);top:35%;left:50%;animation:drift 24s ease-in-out infinite -18s;}
+@keyframes drift{0%,100%{transform:translate(0,0) scale(1);}33%{transform:translate(22px,-32px) scale(1.08);}66%{transform:translate(-16px,22px) scale(0.93);}}
+
+#app{position:relative;z-index:2;max-width:430px;margin:0 auto;height:100dvh;display:flex;flex-direction:column;overflow:hidden;}
+
+/* ━━━ STATUS ━━━ */
+.sbar{
+  padding:calc(var(--safe-t) - 6px) 20px 6px;
+  display:flex;justify-content:space-between;align-items:center;flex-shrink:0;
+}
+#clockEl{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--snow3);}
+.sbar-r{display:flex;align-items:center;gap:7px;}
+.sync-pill{
+  display:flex;align-items:center;gap:5px;padding:3px 11px;border-radius:20px;
+  font-family:'Epilogue',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.07em;
+  transition:all 0.4s ease;border:1px solid transparent;
+}
+.sync-idle      {background:rgba(232,237,244,0.06);border-color:var(--rim);color:var(--snow3);}
+.sync-fetching  {background:rgba(255,173,31,0.1);border-color:rgba(255,173,31,0.25);color:var(--c3);}
+.sync-ok        {background:rgba(0,255,204,0.08);border-color:rgba(0,255,204,0.22);color:var(--c1);}
+.sync-error     {background:rgba(255,62,108,0.1);border-color:rgba(255,62,108,0.25);color:var(--c2);}
+.sdot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:sdot 2s ease-in-out infinite;}
+@keyframes sdot{0%,100%{opacity:1;}50%{opacity:0.2;}}
+.sbar-bat{font-size:10px;color:var(--snow3);font-family:'JetBrains Mono',monospace;}
+
+/* ━━━ HEADER ━━━ */
+.hdr{padding:4px 20px 14px;display:flex;justify-content:space-between;align-items:flex-end;flex-shrink:0;}
+.hdr-l .brand{font-size:30px;font-weight:900;letter-spacing:-0.03em;line-height:1;
+  background:linear-gradient(120deg,var(--snow) 0%,var(--c1) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+.hdr-l .sub{font-size:10px;font-weight:600;letter-spacing:0.16em;text-transform:uppercase;color:var(--snow4);margin-top:3px;}
+.hdr-r{text-align:right;}
+.hdr-r .datestr{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--snow3);}
+.hdr-r .daystr{font-size:18px;font-weight:800;letter-spacing:-0.02em;line-height:1.1;}
+.hdr-r .lastsync{font-size:9px;color:var(--snow4);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+
+/* ━━━ TABS ━━━ */
+.tabs{margin:0 14px;padding:4px;background:rgba(255,255,255,0.035);border:1px solid var(--rim);border-radius:30px;
+  display:grid;grid-template-columns:repeat(4,1fr);gap:2px;flex-shrink:0;}
+.tab{background:none;border:none;border-radius:26px;padding:10px 4px 9px;color:var(--snow4);
+  font-family:'Epilogue',sans-serif;font-size:9px;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;
+  cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:3px;
+  transition:all 0.28s cubic-bezier(0.34,1.56,0.64,1);}
+.tab svg{transition:transform 0.28s cubic-bezier(0.34,1.56,0.64,1);}
+.tab.active{background:rgba(255,255,255,0.09);color:var(--snow);}
+.tab.active svg{transform:scale(1.15);}
+
+/* ━━━ CONTENT ━━━ */
+.content{flex:1;overflow-y:auto;overflow-x:hidden;padding:14px 14px calc(var(--safe-b) + 14px);scroll-behavior:smooth;}
+.content::-webkit-scrollbar{display:none;}
+.panel{display:none;animation:up 0.36s cubic-bezier(0.22,1,0.36,1) both;}
+.panel.active{display:block;}
+@keyframes up{from{opacity:0;transform:translateY(14px);}to{opacity:1;transform:translateY(0);}}
+
+/* ━━━ SETUP SCREEN ━━━ */
+#setup{
+  position:fixed;inset:0;z-index:60;background:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:40px 26px calc(var(--safe-b)+40px);
+  transition:opacity 0.5s ease;
+}
+#setup.gone{opacity:0;pointer-events:none;}
+.setup-brand{font-size:56px;font-weight:900;letter-spacing:-0.04em;line-height:1;
+  background:linear-gradient(120deg,var(--snow),var(--c1));-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;}
+.setup-model{font-size:11px;font-weight:700;letter-spacing:0.16em;text-transform:uppercase;color:var(--snow4);margin-bottom:52px;}
+.setup-block{width:100%;background:var(--glass);border:1px solid var(--rim2);border-radius:var(--r);padding:22px;margin-bottom:12px;}
+.setup-block-title{font-size:14px;font-weight:800;margin-bottom:5px;}
+.setup-block-desc{font-size:12px;color:var(--snow2);line-height:1.6;margin-bottom:18px;}
+.btn{width:100%;padding:16px;border-radius:var(--r2);border:none;cursor:pointer;
+  font-family:'Epilogue',sans-serif;font-size:15px;font-weight:800;letter-spacing:0.04em;
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  transition:transform 0.18s,opacity 0.18s;}
+.btn:active{transform:scale(0.97);opacity:0.88;}
+.btn-primary{background:linear-gradient(135deg,var(--c1),#00CCA3);color:#061410;}
+.btn-ghost{background:rgba(255,255,255,0.06);border:1px solid var(--rim2);color:var(--snow2);font-size:13px;margin-top:8px;}
+.setup-note{font-size:10px;color:var(--snow4);text-align:center;margin-top:18px;line-height:1.7;}
+.setup-note a{color:var(--c1);text-decoration:none;}
+
+/* ━━━ CARDS ━━━ */
+.card{background:var(--glass);border:1px solid var(--rim);border-radius:var(--r);
+  padding:18px;margin-bottom:12px;position:relative;overflow:hidden;
+  transition:transform 0.18s;}
+.card:active{transform:scale(0.988);}
+.stripe{position:absolute;top:0;left:0;right:0;height:2px;border-radius:var(--r) var(--r) 0 0;}
+.chead{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.ctitle{font-size:10px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--snow4);display:flex;align-items:center;gap:7px;}
+.chip{padding:2px 8px;border-radius:10px;font-size:8px;font-weight:800;letter-spacing:0.1em;}
+.chip-s{background:rgba(0,255,204,0.1);color:var(--c1);}
+.chip-new{background:rgba(61,214,140,0.12);color:var(--c6);display:flex;align-items:center;gap:3px;}
+
+/* ━━━ SUMMARY GRID ━━━ */
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+.scell{background:var(--glass2);border:1px solid var(--rim2);border-radius:var(--r2);padding:16px 14px;position:relative;overflow:hidden;}
+.scell-glow{position:absolute;bottom:-20px;right:-20px;width:70px;height:70px;border-radius:50%;filter:blur(22px);opacity:0.14;}
+.scell-icon{font-size:22px;margin-bottom:9px;display:block;}
+.scell-val{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;letter-spacing:-0.03em;line-height:1;display:block;}
+.scell-unit{font-size:11px;color:var(--snow2);margin-left:2px;}
+.scell-lbl{font-size:10px;color:var(--snow4);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;margin-top:5px;}
+.scell-sub{font-size:10px;color:var(--snow3);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+
+/* ━━━ CALORIE BLOCK ━━━ */
+.cal-row{display:flex;justify-content:space-between;align-items:center;padding:15px 0;border-bottom:1px solid var(--rim);}
+.cal-row:last-of-type{border-bottom:none;}
+.cal-l{display:flex;align-items:center;gap:12px;}
+.cal-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.cal-name{font-size:14px;font-weight:600;}
+.cal-desc{font-size:10px;color:var(--snow4);margin-top:3px;}
+.cal-amount{font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:700;}
+.cal-total{margin-top:6px;padding:14px 16px;background:rgba(0,255,204,0.055);border:1px solid rgba(0,255,204,0.14);border-radius:var(--r2);display:flex;justify-content:space-between;align-items:center;}
+.cal-total-lbl{font-size:12px;font-weight:800;letter-spacing:0.02em;}
+.cal-total-sub{font-size:10px;color:var(--snow4);margin-top:2px;}
+.cal-total-val{font-size:36px;font-weight:900;color:var(--c1);letter-spacing:-0.03em;font-family:'JetBrains Mono',monospace;}
+
+/* ━━━ WORKOUT LIST ━━━ */
+.workout-item{display:flex;gap:13px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rim);}
+.workout-item:last-child{border-bottom:none;}
+.wi-icon-wrap{width:46px;height:46px;border-radius:var(--r3);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;}
+.wi-info{flex:1;}
+.wi-name{font-size:14px;font-weight:700;}
+.wi-meta{font-size:10px;color:var(--snow4);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+.wi-stats{text-align:right;}
+.wi-cal{font-size:17px;font-weight:800;font-family:'JetBrains Mono',monospace;}
+.wi-hr{font-size:10px;color:var(--snow3);margin-top:3px;font-family:'JetBrains Mono',monospace;}
+.wi-dur{font-size:10px;color:var(--snow4);margin-top:2px;font-family:'JetBrains Mono',monospace;}
+
+/* empty state */
+.empty-state{text-align:center;padding:32px 20px;color:var(--snow4);}
+.empty-state .ei{font-size:36px;margin-bottom:10px;}
+.empty-state .et{font-size:13px;font-weight:600;color:var(--snow3);margin-bottom:4px;}
+.empty-state .es{font-size:11px;line-height:1.6;}
+
+/* ━━━ HR DETAIL ━━━ */
+.hr-summary{display:flex;gap:0;margin-bottom:18px;}
+.hr-stat{flex:1;text-align:center;padding:14px 8px;}
+.hr-stat+.hr-stat{border-left:1px solid var(--rim);}
+.hr-stat-val{font-family:'JetBrains Mono',monospace;font-size:24px;font-weight:700;line-height:1;}
+.hr-stat-lbl{font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.09em;text-transform:uppercase;margin-top:5px;}
+.zones{display:flex;flex-direction:column;gap:9px;}
+.zr{display:flex;align-items:center;gap:9px;}
+.zr-name{font-size:10px;font-weight:700;color:var(--snow2);width:68px;flex-shrink:0;}
+.zr-track{flex:1;height:7px;background:rgba(255,255,255,0.06);border-radius:10px;overflow:hidden;}
+.zr-fill{height:100%;border-radius:10px;transition:width 1.3s cubic-bezier(0.34,1.56,0.64,1);}
+.zr-val{font-size:10px;font-family:'JetBrains Mono',monospace;color:var(--snow4);width:32px;text-align:right;}
+
+/* ━━━ WELLNESS ━━━ */
+.well-hero{display:flex;gap:18px;align-items:center;padding:6px 0 18px;}
+.well-ring{position:relative;flex-shrink:0;width:100px;height:100px;}
+.well-ring svg{transform:rotate(-90deg);}
+.well-ring-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.well-pct{font-size:32px;font-weight:900;letter-spacing:-0.03em;line-height:1;}
+.well-unit{font-size:9px;color:var(--snow4);font-weight:700;margin-top:-2px;}
+.well-label{font-size:19px;font-weight:800;letter-spacing:-0.02em;}
+.well-desc{font-size:11px;color:var(--snow2);margin-top:4px;line-height:1.55;}
+.well-metrics{display:flex;flex-direction:column;gap:8px;margin-top:10px;}
+.wm{display:flex;justify-content:space-between;align-items:center;}
+.wm-lbl{font-size:10px;color:var(--snow4);font-weight:600;}
+.wm-val{font-size:11px;font-family:'JetBrains Mono',monospace;font-weight:700;}
+.well-rows{display:flex;flex-direction:column;gap:9px;}
+.well-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:var(--glass2);border:1px solid var(--rim);border-radius:var(--r3);}
+.wr-l{display:flex;align-items:center;gap:10px;}
+.wr-icon{font-size:19px;}
+.wr-name{font-size:13px;font-weight:700;}
+.wr-sub{font-size:10px;color:var(--snow4);margin-top:2px;}
+.wr-val{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;}
+
+/* ━━━ STEPS / DIST ━━━ */
+.step-hero{display:flex;justify-content:space-between;align-items:flex-end;padding:6px 0 16px;}
+.step-big{font-size:64px;font-weight:900;letter-spacing:-0.04em;line-height:1;color:var(--c3);}
+.step-r{text-align:right;}
+.step-dist{font-family:'JetBrains Mono',monospace;font-size:26px;font-weight:700;color:var(--c4);}
+.step-lbl{font-size:10px;color:var(--snow4);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;margin-top:4px;}
+.prog-row{display:flex;justify-content:space-between;margin-bottom:7px;}
+.prog-lbl{font-size:11px;color:var(--snow2);font-weight:600;}
+.prog-val{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--snow2);}
+.prog-track{height:8px;background:rgba(255,255,255,0.07);border-radius:12px;overflow:hidden;margin-bottom:16px;}
+.prog-fill{height:100%;border-radius:12px;transition:width 1.3s cubic-bezier(0.34,1.56,0.64,1);position:relative;}
+.prog-fill::after{content:'';position:absolute;right:0;top:0;bottom:0;width:3px;background:rgba(255,255,255,0.5);filter:blur(1px);}
+.mini-stats{display:flex;gap:9px;}
+.ms{flex:1;text-align:center;padding:11px;background:rgba(255,255,255,0.04);border-radius:var(--r3);}
+.ms-val{font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;}
+.ms-lbl{font-size:9px;color:var(--snow4);font-weight:700;letter-spacing:0.07em;text-transform:uppercase;margin-top:4px;}
+
+/* ━━━ WEEKLY CHART ━━━ */
+.wchart{display:flex;align-items:flex-end;gap:6px;height:88px;padding:0 2px;margin-bottom:10px;}
+.wday{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;height:100%;justify-content:flex-end;}
+.wbars{width:100%;flex:1;display:flex;flex-direction:column;justify-content:flex-end;gap:2px;}
+.wbar{width:100%;border-radius:4px;min-height:3px;}
+.wdl{font-size:8px;font-weight:800;letter-spacing:0.04em;color:var(--snow4);flex-shrink:0;}
+.wdl.today{color:var(--c1);}
+
+/* ━━━ GOALS ━━━ */
+.goals-list{display:flex;flex-direction:column;gap:9px;}
+.goal-item{background:var(--glass2);border:1px solid var(--rim);border-radius:var(--r2);padding:14px;display:flex;align-items:center;gap:13px;transition:transform 0.18s;}
+.goal-item:active{transform:scale(0.985);}
+.gmr{width:52px;height:52px;flex-shrink:0;position:relative;}
+.gmr svg{transform:rotate(-90deg);}
+.gmr-c{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;}
+.gb{flex:1;}
+.g-name{font-size:14px;font-weight:700;margin-bottom:3px;}
+.g-prog{font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--snow2);}
+.g-streak{font-size:10px;color:var(--c3);font-weight:700;margin-top:3px;}
+.g-edit{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,0.05);border:1px solid var(--rim);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:15px;flex-shrink:0;transition:background 0.18s;}
+.g-edit:active{background:rgba(255,255,255,0.12);}
+.sec-lbl{font-size:10px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;color:var(--snow4);margin:14px 2px 10px;display:flex;align-items:center;gap:8px;}
+.sec-lbl::after{content:'';flex:1;height:1px;background:var(--rim);}
+
+/* ━━━ EOD REPORT ━━━ */
+.eod-grid{display:flex;flex-direction:column;gap:9px;}
+.eod-row{display:flex;justify-content:space-between;align-items:center;padding:13px 15px;background:var(--glass2);border:1px solid var(--rim);border-radius:var(--r2);}
+.eod-lbl{font-size:13px;font-weight:600;}
+.eod-val{font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;}
+
+/* ━━━ MODAL ━━━ */
+.modal-bg{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.8);backdrop-filter:blur(14px);display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity 0.3s;}
+.modal-bg.open{opacity:1;pointer-events:all;}
+.modal-sheet{width:100%;max-width:430px;margin:0 auto;background:#0E151D;border-radius:28px 28px 0 0;border-top:1px solid var(--rim2);padding:20px 22px calc(var(--safe-b) + 22px);transform:translateY(100%);transition:transform 0.38s cubic-bezier(0.34,1.56,0.64,1);}
+.modal-bg.open .modal-sheet{transform:translateY(0);}
+.modal-handle{width:40px;height:4px;border-radius:10px;background:rgba(255,255,255,0.12);margin:0 auto 20px;}
+.modal-title{font-size:20px;font-weight:800;margin-bottom:18px;letter-spacing:-0.02em;}
+.mlbl{font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:var(--snow4);margin-bottom:7px;display:block;}
+.minput{width:100%;background:rgba(255,255,255,0.06);border:1px solid var(--rim2);border-radius:var(--r2);padding:14px 16px;color:var(--snow);font-family:'JetBrains Mono',monospace;font-size:22px;font-weight:600;outline:none;transition:border-color 0.2s;-webkit-appearance:none;}
+.minput:focus{border-color:var(--c1);}
+.msave{width:100%;padding:16px;border-radius:var(--r2);background:linear-gradient(135deg,var(--c1),#00CCA3);border:none;color:#061410;font-family:'Epilogue',sans-serif;font-size:16px;font-weight:800;cursor:pointer;margin-top:12px;transition:transform 0.18s,opacity 0.18s;}
+.msave:active{transform:scale(0.97);opacity:0.88;}
+
+/* ━━━ TOAST ━━━ */
+.toast{position:fixed;top:calc(var(--safe-t) + 56px);left:50%;transform:translateX(-50%) translateY(-12px);z-index:300;
+  background:rgba(0,255,204,0.12);border:1px solid rgba(0,255,204,0.28);backdrop-filter:blur(20px);
+  padding:10px 20px;border-radius:30px;font-size:12px;font-weight:700;color:var(--c1);letter-spacing:0.05em;
+  opacity:0;transition:all 0.35s cubic-bezier(0.34,1.56,0.64,1);pointer-events:none;white-space:nowrap;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+/* update flash */
+@keyframes valFlash{from{opacity:0.3;}to{opacity:1;}}
+.v-flash{animation:valFlash 0.4s ease-out;}
+</style>
+</head>
+<body>
+
+<div class="orbs"><div class="orb orb1"></div><div class="orb orb2"></div><div class="orb orb3"></div></div>
+
+<!-- ══════════ SETUP SCREEN ══════════ -->
+<div id="setup">
+  <div class="setup-brand">VERTICAL</div>
+  <div class="setup-model">Suunto Vertical Titanium</div>
+
+  <div class="setup-block">
+    <div class="setup-block-title">🔗 Suunto Hesabı ile Bağlan</div>
+    <div class="setup-block-desc">
+      Antrenman bitince Suunto app'e kaydettiğin an uygulama otomatik güncellenir.
+      Günlük özet, ortalama nabız, kalori, adım, BMH, zindelik verileri otomatik akar.
+      Her 5 dakikada bir yeni veri var mı kontrol edilir.
+    </div>
+    <button class="btn btn-primary" onclick="startAuth()">⌚ Suunto ile Giriş Yap</button>
+  </div>
+
+  <button class="btn btn-ghost" onclick="startDemo()">Demo Modunda Gör →</button>
+
+  <div class="setup-note">
+    Gerçek bağlantı için önce <a href="https://apizone.suunto.com" target="_blank">apizone.suunto.com</a>'dan<br>
+    ücretsiz Client ID alın ve dosyada SUUNTO_CLIENT_ID'yi güncelleyin.
+  </div>
+</div>
+
+<!-- ══════════ TOAST ══════════ -->
+<div class="toast" id="toastEl"></div>
+
+<!-- ══════════ MAIN APP ══════════ -->
+<div id="app" style="opacity:0;transition:opacity 0.55s ease;">
+
+  <!-- Status -->
+  <div class="sbar">
+    <span id="clockEl">09:41</span>
+    <div class="sbar-r">
+      <div class="sync-pill sync-idle" id="syncPill">
+        <span class="sdot"></span>
+        <span id="syncTxt">HAZIR</span>
+      </div>
+      <span class="sbar-bat" id="batEl"></span>
+    </div>
+  </div>
+
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-l">
+      <div class="brand">VERTICAL</div>
+      <div class="sub">Suunto Vertical Titanium</div>
+    </div>
+    <div class="hdr-r">
+      <div class="datestr" id="hdDate">—</div>
+      <div class="daystr" id="hdDay">—</div>
+      <div class="lastsync" id="lastSyncEl">Bekleniyor…</div>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <button class="tab active" onclick="goTab('home',this)">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Özet
+    </button>
+    <button class="tab" onclick="goTab('workouts',this)">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Antrenman
+    </button>
+    <button class="tab" onclick="goTab('wellness',this)">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+      Sağlık
+    </button>
+    <button class="tab" onclick="goTab('goals',this)">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      Hedefler
+    </button>
+  </div>
+
+  <!-- Content -->
+  <div class="content">
+
+    <!-- ▸ ÖZET -->
+    <div id="panel-home" class="panel active">
+
+      <div class="sgrid">
+        <div class="scell">
+          <div class="scell-glow" style="background:var(--c2)"></div>
+          <span class="scell-icon">❤️</span>
+          <span><span class="scell-val" style="color:var(--c2)" id="hrAvgCell">—</span><span class="scell-unit">bpm</span></span>
+          <div class="scell-lbl">Ort. Nabız</div>
+          <div class="scell-sub" id="hrSub">Bugün ortalama</div>
+        </div>
+        <div class="scell">
+          <div class="scell-glow" style="background:var(--c4)"></div>
+          <span class="scell-icon">🫁</span>
+          <span><span class="scell-val" style="color:var(--c4)" id="spo2Cell">—</span><span class="scell-unit">%</span></span>
+          <div class="scell-lbl">SpO₂</div>
+          <div class="scell-sub" id="spo2Sub">Son ölçüm</div>
+        </div>
+        <div class="scell">
+          <div class="scell-glow" style="background:var(--c3)"></div>
+          <span class="scell-icon">🔥</span>
+          <span><span class="scell-val" style="color:var(--c3)" id="activeCalCell">—</span><span class="scell-unit">kcal</span></span>
+          <div class="scell-lbl">Aktif Kalori</div>
+          <div class="scell-sub" id="calSub">—</div>
+        </div>
+        <div class="scell">
+          <div class="scell-glow" style="background:var(--c5)"></div>
+          <span class="scell-icon">👟</span>
+          <span><span class="scell-val" style="color:var(--c5)" id="stepsCell">—</span></span>
+          <div class="scell-lbl">Adım</div>
+          <div class="scell-sub" id="stepsSub">—</div>
+        </div>
+      </div>
+
+      <!-- Calorie breakdown -->
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c1),var(--c3))"></div>
+        <div class="chead"><div class="ctitle">Kalori Özeti <span class="chip chip-s">BUGÜN</span></div></div>
+        <div class="cal-row">
+          <div class="cal-l">
+            <div class="cal-dot" style="background:var(--c1)"></div>
+            <div><div class="cal-name">Bazal Metabolizma</div><div class="cal-desc">Dinlenme hâlindeki kalori yakımı</div></div>
+          </div>
+          <div class="cal-amount" style="color:var(--c1)" id="bmrVal">—</div>
+        </div>
+        <div class="cal-row">
+          <div class="cal-l">
+            <div class="cal-dot" style="background:var(--c3)"></div>
+            <div><div class="cal-name">Aktif Kalori</div><div class="cal-desc">Hareket + antrenman yakımı</div></div>
+          </div>
+          <div class="cal-amount" style="color:var(--c3)" id="activeCalVal">—</div>
+        </div>
+        <div class="cal-total">
+          <div>
+            <div class="cal-total-lbl">TOPLAM YAKILAN</div>
+            <div class="cal-total-sub">BMH + Aktif kalori</div>
+          </div>
+          <div class="cal-total-val" id="totalCalVal">—</div>
+        </div>
+      </div>
+
+      <!-- Wellness mini -->
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c5),var(--c4))"></div>
+        <div class="chead"><div class="ctitle">Zindelik <span class="chip chip-s">SUUNTO AI</span></div></div>
+        <div class="well-hero">
+          <div class="well-ring">
+            <svg width="100" height="100" viewBox="0 0 100 100" style="transform:rotate(-90deg)">
+              <circle cx="50" cy="50" r="40" fill="none" stroke="rgba(181,123,255,0.15)" stroke-width="8"/>
+              <circle cx="50" cy="50" r="40" fill="none" stroke="var(--c5)" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="251" id="wellRing" stroke-dashoffset="251"/>
+            </svg>
+            <div class="well-ring-center">
+              <span class="well-pct" style="color:var(--c5)" id="wellPct">—</span>
+              <span class="well-unit">%</span>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div class="well-label" style="color:var(--c5)" id="wellLabel">—</div>
+            <div class="well-desc" id="wellDesc">Veri bekleniyor…</div>
+            <div class="well-metrics">
+              <div class="wm"><span class="wm-lbl">😴 Uyku</span><span class="wm-val" style="color:var(--c4)" id="sleepWm">—</span></div>
+              <div class="wm"><span class="wm-lbl">🔄 Toparlanma</span><span class="wm-val" style="color:var(--c6)" id="recovWm">—</span></div>
+              <div class="wm"><span class="wm-lbl">😓 Stres</span><span class="wm-val" style="color:var(--c3)" id="stressWm">—</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ▸ ANTRENMAN -->
+    <div id="panel-workouts" class="panel">
+
+      <!-- Today's workouts -->
+      <div class="card" id="todayWorkoutsCard">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c2),#FF8FAB)"></div>
+        <div class="chead">
+          <div class="ctitle">Bugünkü Antrenmanlar <span class="chip chip-s">OTOMATİK</span></div>
+        </div>
+        <div id="todayWorkoutsList">
+          <div class="empty-state">
+            <div class="ei">⌚</div>
+            <div class="et">Henüz antrenman yok</div>
+            <div class="es">Suunto app'e antrenman kaydettiğinde<br>burada otomatik görünür.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Steps + distance -->
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c3),#FFCF5C)"></div>
+        <div class="chead"><div class="ctitle">Adım & Mesafe <span class="chip chip-s">BUGÜN</span></div></div>
+        <div class="step-hero">
+          <div><div class="step-big" id="stepsBig">—</div><div class="step-lbl">Adım</div></div>
+          <div class="step-r">
+            <div><span class="step-dist" id="distBig">—</span><span style="font-size:14px;color:var(--snow2)"> km</span></div>
+            <div class="step-lbl" style="margin-top:4px">Mesafe</div>
+          </div>
+        </div>
+        <div class="prog-row"><span class="prog-lbl">Günlük Hedef</span><span class="prog-val" id="stepsProgTxt">—</span></div>
+        <div class="prog-track"><div class="prog-fill" id="stepsBar" style="width:0%;background:linear-gradient(90deg,var(--c3),#FFCF5C)"></div></div>
+        <div class="mini-stats">
+          <div class="ms"><div class="ms-val" style="color:var(--c3)" id="cadEl">—</div><div class="ms-lbl">Kadans/dk</div></div>
+          <div class="ms"><div class="ms-val" style="color:var(--c4)" id="paceEl">—</div><div class="ms-lbl">Hız/km</div></div>
+          <div class="ms"><div class="ms-val" style="color:var(--c5)" id="elevEl">—</div><div class="ms-lbl">İrtifa m</div></div>
+        </div>
+      </div>
+
+      <!-- Weekly chart -->
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c4),var(--c5))"></div>
+        <div class="chead"><div class="ctitle">Haftalık Aktif Kalori <span class="chip chip-s">7 GÜN</span></div></div>
+        <div class="wchart" id="wchartEl"></div>
+        <div style="display:flex;gap:14px;justify-content:center;margin-bottom:14px;">
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--snow4)"><div style="width:8px;height:8px;border-radius:2px;background:var(--c3)"></div>Aktif</div>
+          <div style="display:flex;align-items:center;gap:5px;font-size:10px;color:var(--snow4)"><div style="width:8px;height:8px;border-radius:2px;background:var(--c1)"></div>BMH</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:var(--c3)" id="wActiveSum">—</div><div style="font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.06em;margin-top:3px;text-transform:uppercase">Aktif kcal</div></div>
+          <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:var(--c5)" id="wWorkouts">—</div><div style="font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.06em;margin-top:3px;text-transform:uppercase">Antrenman</div></div>
+          <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:var(--c4)" id="wDistSum">—</div><div style="font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.06em;margin-top:3px;text-transform:uppercase">km</div></div>
+          <div style="text-align:center"><div style="font-family:'JetBrains Mono',monospace;font-size:17px;font-weight:700;color:var(--c6)" id="wVo2">—</div><div style="font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.06em;margin-top:3px;text-transform:uppercase">VO₂max</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ▸ SAĞLIK -->
+    <div id="panel-wellness" class="panel">
+
+      <!-- Heart Rate detail -->
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c2),#FF8FAB)"></div>
+        <div class="chead"><div class="ctitle">Nabız (Gün Ortalaması) <span class="chip chip-s">SUUNTO</span></div></div>
+        <div class="hr-summary">
+          <div class="hr-stat"><div class="hr-stat-val" style="color:var(--c2)" id="hrMin">—</div><div class="hr-stat-lbl">Min</div></div>
+          <div class="hr-stat"><div class="hr-stat-val" style="color:var(--snow2)" id="hrAvg">—</div><div class="hr-stat-lbl">Ortalama</div></div>
+          <div class="hr-stat"><div class="hr-stat-val" style="color:var(--snow2)" id="hrRest">—</div><div class="hr-stat-lbl">Dinlenme</div></div>
+          <div class="hr-stat"><div class="hr-stat-val" style="color:var(--c2)" id="hrMax">—</div><div class="hr-stat-lbl">Maks</div></div>
+        </div>
+        <div class="ctitle" style="margin-bottom:12px">Nabız Bölgesi Dağılımı</div>
+        <div class="zones" id="zonesEl"></div>
+      </div>
+
+      <!-- SpO2 -->
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c4),#90B8F8)"></div>
+        <div class="chead"><div class="ctitle">Kan Oksijeni SpO₂ <span class="chip chip-s">SUUNTO</span></div></div>
+        <div style="display:flex;align-items:center;justify-content:center;gap:28px;padding:10px 0 16px;">
+          <div style="position:relative;width:110px;height:110px;flex-shrink:0;">
+            <svg width="110" height="110" viewBox="0 0 110 110" style="transform:rotate(-90deg)">
+              <circle cx="55" cy="55" r="44" fill="none" stroke="rgba(79,142,247,0.1)" stroke-width="8"/>
+              <circle cx="55" cy="55" r="44" fill="none" stroke="var(--c4)" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="276" id="spo2Ring" stroke-dashoffset="20"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;">
+              <span style="font-size:40px;font-weight:900;color:var(--c4);line-height:1;" id="spo2Big">—</span>
+              <span style="font-size:11px;color:var(--snow2);font-weight:600;">%</span>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:13px;">
+            <div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;color:var(--c4)" id="spo2Status">—</div><div style="font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">Durum</div></div>
+            <div><div style="font-family:'JetBrains Mono',monospace;font-size:19px;font-weight:700;color:var(--snow2)">94–100</div><div style="font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">Normal Aralık</div></div>
+            <div><div style="font-family:'JetBrains Mono',monospace;font-size:16px;font-weight:700;color:var(--snow2)" id="spo2Time">—</div><div style="font-size:9px;color:var(--snow4);font-weight:800;letter-spacing:0.08em;text-transform:uppercase;margin-top:2px">Son Ölçüm</div></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wellness full -->
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c5),#C4B5FD)"></div>
+        <div class="chead"><div class="ctitle">Zindelik Detayları <span class="chip chip-s">SUUNTO AI</span></div></div>
+        <div class="well-rows" id="wellRowsEl"></div>
+      </div>
+    </div>
+
+    <!-- ▸ HEDEFLER -->
+    <div id="panel-goals" class="panel">
+      <div class="sec-lbl">Günlük Hedefler</div>
+      <div class="goals-list" id="dailyGoalsEl"></div>
+      <div class="sec-lbl" style="margin-top:18px">Haftalık Hedefler</div>
+      <div class="goals-list" id="weeklyGoalsEl"></div>
+      <div class="sec-lbl" style="margin-top:18px">Gün Sonu Raporu</div>
+      <div class="card">
+        <div class="stripe" style="background:linear-gradient(90deg,var(--c1),var(--c4))"></div>
+        <div class="eod-grid">
+          <div class="eod-row"><span class="eod-lbl">🔥 Toplam Yakılan</span><span class="eod-val" style="color:var(--c1)" id="eodTotal">—</span></div>
+          <div class="eod-row"><span class="eod-lbl">💤 Bazal Metabolizma</span><span class="eod-val" style="color:var(--c4)" id="eodBmr">—</span></div>
+          <div class="eod-row"><span class="eod-lbl">⚡ Aktif Kalori</span><span class="eod-val" style="color:var(--c3)" id="eodActive">—</span></div>
+          <div class="eod-row"><span class="eod-lbl">👟 Adım / Mesafe</span><span class="eod-val" style="color:var(--c5)" id="eodSteps">—</span></div>
+          <div class="eod-row"><span class="eod-lbl">❤️ Ort. Nabız (gün)</span><span class="eod-val" style="color:var(--c2)" id="eodHr">—</span></div>
+          <div class="eod-row"><span class="eod-lbl">🫁 SpO₂</span><span class="eod-val" style="color:var(--c4)" id="eodSpo2">—</span></div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /content -->
+</div><!-- /app -->
+
+<!-- Goal Edit Modal -->
+<div class="modal-bg" id="goalModal" onclick="modalTap(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modalTitleEl">Hedef Düzenle</div>
+    <label class="mlbl" id="modalLblEl">Hedef</label>
+    <input class="minput" type="number" id="modalInputEl" inputmode="numeric"/>
+    <button class="msave" onclick="saveGoal()">KAYDET ✓</button>
+  </div>
+</div>
+
+<script>
+/* ════════════════════════════════════════════
+   ⚙️  SUUNTO API CONFIGURATION
+   ────────────────────────────────────────────
+   1. apizone.suunto.com → giriş yap → Applications → Create
+   2. Redirect URI olarak bu dosyanın URL'ini yaz
+   3. Aşağıdaki CLIENT_ID'yi kendi değerinle değiştir
+════════════════════════════════════════════ */
+const CFG = {
+  CLIENT_ID:    'mertcan500',   // ← buraya kendi ID'ni yaz
+  REDIRECT_URI: location.href.split('?')[0].split('#')[0],
+  SCOPE:        'workouts activity',
+  AUTH_URL:     'https://cloudapi-oauth.suunto.com/oauth/authorize',
+  TOKEN_URL:    'https://cloudapi-oauth.suunto.com/oauth/token',
+  API:          'https://cloudapi.suunto.com/v2',
+  POLL_MS:      1 * 60 * 1000,            // 1 dakikada bir kontrol
+};
+
+/* ════════════════════════════════════════════
+   STATE
+════════════════════════════════════════════ */
+const ST = {
+  token: null,
+  isDemo: false,
+  pollTimer: null,
+  lastWorkoutId: null,  // yeni antrenman tespiti için
+
+  d: {
+    // today
+    hrAvg: null, hrMin: null, hrMax: null, hrRest: null,
+    spo2: null,
+    bmr: null, activeCal: null,
+    steps: null, dist: null,
+    cadence: null, pace: null, elev: null,
+    // wellness
+    wellScore: null, recovery: null, sleepScore: null, stressScore: null, vo2max: null,
+    // zones (minutes per zone today)
+    zones: [0, 0, 0, 0, 0],
+    // weekly
+    weeklyActive: [], weeklyBmr: [],
+    weeklyWorkouts: 0, weeklyDist: 0,
+    // today's workout list
+    todayWorkouts: [],
+    battery: null,
+  },
+
+  goals: {
+    activeCal: { label:'Aktif Kalori',  unit:'kcal', icon:'🔥', color:'var(--c3)',  current:0, target:600,   streak:9  },
+    steps:     { label:'Adım Sayısı',   unit:'adım', icon:'👟', color:'var(--c5)', current:0, target:10000, streak:14 },
+    dist:      { label:'Mesafe',        unit:'km',   icon:'📍', color:'var(--c4)',   current:0, target:10,    streak:6  },
+    hrAvg:     { label:'Ort. Nabız Maks',unit:'bpm', icon:'❤️', color:'var(--c2)',  current:0, target:160,   streak:3  },
+  },
+  weeklyGoals: {
+    workouts:  { label:'Antrenman Günü', unit:'gün',  icon:'🏋️', color:'var(--c1)', current:0, target:6,    streak:3 },
+    wCal:      { label:'Haftalık Aktif', unit:'kcal', icon:'🔥', color:'var(--c3)', current:0, target:4200, streak:2 },
+    wDist:     { label:'Haftalık Mesafe',unit:'km',   icon:'📍', color:'var(--c4)', current:0, target:70,   streak:1 },
+  },
+
+  editKey: null, editGroup: null,
+};
+
+const WORKOUT_TYPES = {
+  1:'🏃 Koşu', 2:'🚴 Bisiklet', 3:'🏊 Yüzme', 4:'🥾 Yürüyüş',
+  5:'🎿 Kayak', 6:'⛷️ Dağ Kayağı', 7:'🏂 Snowboard', 8:'🧗 Tırmanış',
+  9:'🚵 MTB', 10:'💪 Gym', 11:'🏋️ Ağırlık', 12:'🤸 Yoga',
+  RUNNING:'🏃 Koşu', CYCLING:'🚴 Bisiklet', SWIMMING:'🏊 Yüzme',
+  TRAIL_RUNNING:'🏔️ Patika Koşusu', HIKING:'🥾 Yürüyüş',
+  OTHER:'⚡ Aktivite',
+};
+
+/* ════════════════════════════════════════════
+   CLOCK
+════════════════════════════════════════════ */
+function tickClock() {
+  const n = new Date(), p = v => String(v).padStart(2,'0');
+  g('clockEl').textContent = `${p(n.getHours())}:${p(n.getMinutes())}`;
+  const months = ['OCA','ŞUB','MAR','NİS','MAY','HAZ','TEM','AĞU','EYL','EKİ','KAS','ARA'];
+  const days   = ['Pazar','Pazartesi','Salı','Çarşamba','Perşembe','Cuma','Cumartesi'];
+  g('hdDate').textContent = `${n.getDate()} ${months[n.getMonth()]} ${n.getFullYear()}`;
+  g('hdDay').textContent  = days[n.getDay()];
+  const now = `${p(n.getHours())}:${p(n.getMinutes())}`;
+  g('spo2Time').textContent = now;
+}
+
+/* ════════════════════════════════════════════
+   SUUNTO OAUTH
+════════════════════════════════════════════ */
+function startAuth() {
+  if (CFG.CLIENT_ID === 'YOUR_SUUNTO_CLIENT_ID') {
+    toast('⚠ Client ID girilmemiş — Demo modu açılıyor');
+    setTimeout(startDemo, 1500);
+    return;
+  }
+  const state = Math.random().toString(36).slice(2);
+  sessionStorage.setItem('oauth_state', state);
+  const url = `${CFG.AUTH_URL}?response_type=code&client_id=${encodeURIComponent(CFG.CLIENT_ID)}&redirect_uri=${encodeURIComponent(CFG.REDIRECT_URI)}&scope=${encodeURIComponent(CFG.SCOPE)}&state=${state}`;
+  location.href = url;
+}
+
+async function exchangeCode(code) {
+  setSyncPill('fetching', 'BAĞLANILIYOR');
+  try {
+    // ⚠️ Production'da bu işlemi backend'de yapın (client_secret güvenliği için)
+    const r = await fetch(CFG.TOKEN_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ grant_type:'authorization_code', code, redirect_uri:CFG.REDIRECT_URI, client_id:CFG.CLIENT_ID }),
+    });
+    const t = await r.json();
+    if (t.access_token) {
+      ST.token = t.access_token;
+      localStorage.setItem('sv_token', t.access_token);
+      if (t.refresh_token) localStorage.setItem('sv_refresh', t.refresh_token);
+      history.replaceState({}, '', location.pathname);
+      launchApp();
+      await fetchAll();
+      startPolling();
+    } else throw new Error('no token');
+  } catch(e) {
+    setSyncPill('error', 'HATA');
+    toast('Bağlantı başarısız');
+  }
+}
+
+async function refreshToken() {
+  const rt = localStorage.getItem('sv_refresh');
+  if (!rt) { setSyncPill('error', 'YENİDEN GİRİŞ'); return false; }
+  try {
+    const r = await fetch(CFG.TOKEN_URL, {
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({ grant_type:'refresh_token', refresh_token:rt, client_id:CFG.CLIENT_ID }),
+    });
+    const t = await r.json();
+    if (t.access_token) {
+      ST.token = t.access_token;
+      localStorage.setItem('sv_token', t.access_token);
+      return true;
+    }
+  } catch(e) {}
+  return false;
+}
+
+/* ════════════════════════════════════════════
+   SUUNTO API — FETCH ALL DATA
+   Bu fonksiyon Suunto app'e veri girince (antrenman
+   kaydedince veya günlük sync olunca) tüm verileri
+   tekrar çeker ve UI'ı günceller.
+════════════════════════════════════════════ */
+async function fetchAll() {
+  if (!ST.token) return;
+  setSyncPill('fetching', 'SYNKLENİYOR');
+
+  try {
+    const todayISO  = new Date().toISOString().split('T')[0];
+    const weekStart = new Date(Date.now() - 6*864e5).toISOString().split('T')[0];
+
+    const api = (path) => fetch(`${CFG.API}${path}`, {
+      headers: {
+        'Authorization': `Bearer ${ST.token}`,
+        'Ocp-Apim-Subscription-Key': CFG.CLIENT_ID,
+      }
+    });
+
+    // ── 1. Today's activity summary ──
+    const [actRes, workRes] = await Promise.all([
+      api(`/activities?since=${todayISO}T00:00:00Z&limit=1`),
+      api(`/workouts?since=${weekStart}&until=${todayISO}&limit=50`),
+    ]);
+
+    if (actRes.status === 401) {
+      const ok = await refreshToken();
+      if (ok) { fetchAll(); return; }
+      setSyncPill('error', 'OTURUM DOLDU'); return;
+    }
+
+    // ── Activity (daily summary) ──
+    if (actRes.ok) {
+      const actData = await actRes.json();
+      const a = actData?.payload?.[0];
+      if (a) {
+        ST.d.steps      = a.steps           ?? ST.d.steps;
+        ST.d.dist       = a.distance        ? +(a.distance/1000).toFixed(2) : ST.d.dist;
+        ST.d.activeCal  = a.calories_active ?? ST.d.activeCal;
+        ST.d.bmr        = a.calories_bmr    ?? ST.d.bmr ?? estimateBMR();
+        ST.d.hrAvg      = a.hr_avg          ?? ST.d.hrAvg;
+        ST.d.hrMin      = a.hr_min          ?? ST.d.hrMin;
+        ST.d.hrMax      = a.hr_max          ?? ST.d.hrMax;
+        ST.d.hrRest     = a.hr_rest         ?? ST.d.hrRest;
+        ST.d.spo2       = a.spo2_avg        ?? ST.d.spo2;
+        if (a.hr_zones) {
+          ST.d.zones = [a.hr_zones.z1, a.hr_zones.z2, a.hr_zones.z3, a.hr_zones.z4, a.hr_zones.z5].map(Number);
+        }
+      }
+    }
+
+    // ── Workouts (today + weekly stats) ──
+    if (workRes.ok) {
+      const workData = await workRes.json();
+      const all = workData?.payload ?? [];
+
+      // Today's workouts
+      ST.d.todayWorkouts = all.filter(w => w.startTime?.startsWith(todayISO));
+
+      // Check for new workout since last fetch → toast notification
+      const latestId = all[0]?.workoutKey ?? all[0]?.id;
+      if (ST.lastWorkoutId && latestId && latestId !== ST.lastWorkoutId) {
+        toast('🎉 Yeni antrenman synclendi!');
+      }
+      ST.lastWorkoutId = latestId;
+
+      // Weekly aggregates
+      ST.d.weeklyWorkouts = all.length;
+      ST.d.weeklyDist     = +(all.reduce((s,w) => s+(w.distance||0), 0)/1000).toFixed(1);
+
+      // Pull avg pace/cadence/elev from today's workouts
+      const todayW = ST.d.todayWorkouts;
+      if (todayW.length) {
+        const lastW = todayW[todayW.length-1];
+        ST.d.cadence = lastW.cadenceAvg ?? ST.d.cadence;
+        ST.d.elev    = lastW.ascent     ?? ST.d.elev;
+        if (lastW.paceAvg) ST.d.pace = secsToPace(lastW.paceAvg);
+        ST.d.vo2max  = lastW.vo2max     ?? ST.d.vo2max;
+      }
+
+      // Weekly chart data (last 7 days)
+      ST.d.weeklyActive = buildWeekArr(all, 'calories',       7);
+      ST.d.weeklyBmr    = buildWeekArr(all, 'calories_bmr_approx', 7, ST.d.bmr || 1800);
+
+      // Weekly goals
+      const wCalTotal = all.reduce((s,w) => s+(w.calories||0), 0);
+      ST.weeklyGoals.wCal.current      = wCalTotal;
+      ST.weeklyGoals.workouts.current  = ST.d.weeklyWorkouts;
+      ST.weeklyGoals.wDist.current     = ST.d.weeklyDist;
+    }
+
+    // ── Wellness (recovery, sleep) ──
+    try {
+      const wellRes = await api(`/wellness?since=${todayISO}T00:00:00Z&limit=1`);
+      if (wellRes.ok) {
+        const wd = await wellRes.json();
+        const w  = wd?.payload?.[0];
+        if (w) {
+          ST.d.recovery   = w.recovery_level   ?? w.recoveryScore  ?? ST.d.recovery;
+          ST.d.sleepScore = w.sleep_score       ?? w.sleepQuality   ?? ST.d.sleepScore;
+          ST.d.stressScore= w.stress_index      ?? w.stressLevel    ?? ST.d.stressScore;
+          const r = ST.d.recovery   || 70;
+          const s = ST.d.sleepScore || 70;
+          ST.d.wellScore  = Math.round((r + s) / 2);
+        }
+      }
+    } catch {}
+
+    // ── Update goals current ──
+    ST.goals.activeCal.current = ST.d.activeCal ?? 0;
+    ST.goals.steps.current     = ST.d.steps     ?? 0;
+    ST.goals.dist.current      = ST.d.dist      ?? 0;
+    ST.goals.hrAvg.current     = ST.d.hrMax     ?? 0;
+
+    // ── Finalize ──
+    const now = new Date();
+    const p = v => String(v).padStart(2,'0');
+    g('lastSyncEl').textContent = `Son sync: ${p(now.getHours())}:${p(now.getMinutes())}`;
+    setSyncPill('ok', 'SYNK OK');
+    updateUI();
+    renderZones();
+    renderWellnessRows();
+    renderWeeklyChart();
+    renderGoals();
+    renderTodayWorkouts();
+
+  } catch(err) {
+    console.error('Suunto API error:', err);
+    setSyncPill('error', 'HATA');
+  }
+}
+
+/* ════════════════════════════════════════════
+   POLLING — 5 dakikada bir, Suunto'da yeni veri
+   var mı diye kontrol eder. Yeni antrenman varsa
+   toast gösterir ve UI'ı günceller.
+════════════════════════════════════════════ */
+function startPolling() {
+  clearInterval(ST.pollTimer);
+  ST.pollTimer = setInterval(fetchAll, CFG.POLL_MS);
+
+  // Page visibility — arka plandan dönünce hemen sync et
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') fetchAll();
+  });
+}
+
+/* ════════════════════════════════════════════
+   DEMO MODE
+════════════════════════════════════════════ */
+function startDemo() {
+  ST.isDemo = true;
+  const d = ST.d;
+  d.hrAvg=74; d.hrMin=52; d.hrMax=168; d.hrRest=58;
+  d.spo2=98; d.bmr=1847; d.activeCal=542;
+  d.steps=9284; d.dist=6.87;
+  d.cadence=84; d.pace='5:34'; d.elev=138;
+  d.wellScore=78; d.recovery=82; d.sleepScore=74; d.stressScore=28; d.vo2max=48;
+  d.zones=[840,1740,1260,600,180];
+  d.weeklyActive=[410,680,355,740,520,390,542];
+  d.weeklyBmr=[1820,1850,1830,1860,1845,1840,1847];
+  d.weeklyWorkouts=5; d.weeklyDist=46.3;
+  d.todayWorkouts=[
+    { activityId:'w1', startTime: new Date().toISOString(), sportTypeId:'RUNNING',
+      duration:2340, distance:6870, calories:342, hrAvg:148, hrMax:168,
+      ascent:78, paceAvg:340 },
+    { activityId:'w2', startTime: new Date(Date.now()-4*3600000).toISOString(), sportTypeId:'CYCLING',
+      duration:1800, distance:14200, calories:200, hrAvg:122, hrMax:145,
+      ascent:60, paceAvg:0 },
+  ];
+
+  ST.goals.activeCal.current=542; ST.goals.steps.current=9284; ST.goals.dist.current=6.87; ST.goals.hrAvg.current=168;
+  ST.weeklyGoals.wCal.current=3437; ST.weeklyGoals.workouts.current=5; ST.weeklyGoals.wDist.current=46.3;
+
+  launchApp();
+  g('lastSyncEl').textContent = 'Demo modu — son sync: şimdi';
+  setSyncPill('ok', 'DEMO');
+  updateUI();
+  renderZones();
+  renderWellnessRows();
+  renderWeeklyChart();
+  renderGoals();
+  renderTodayWorkouts();
+  toast('▶ Demo modu — Suunto hesabınla bağlan');
+}
+
+/* ════════════════════════════════════════════
+   LAUNCH
+════════════════════════════════════════════ */
+function launchApp() {
+  g('setup').classList.add('gone');
+  setTimeout(() => g('setup').style.display='none', 500);
+  g('app').style.opacity='1';
+}
+
+/* ════════════════════════════════════════════
+   UI RENDERERS
+════════════════════════════════════════════ */
+function updateUI() {
+  const d = ST.d;
+  const fmt  = v => v != null ? Math.round(v).toLocaleString('tr-TR') : '—';
+  const fmtD = v => v != null ? Number(v).toFixed(2) : '—';
+
+  // Summary grid
+  flashSet('hrAvgCell', d.hrAvg ? fmt(d.hrAvg) : '—');
+  g('hrSub').textContent = d.hrMin && d.hrMax ? `Min ${d.hrMin} · Maks ${d.hrMax}` : 'Bugün ortalama';
+  flashSet('spo2Cell', d.spo2 ?? '—');
+  const spo2s = spo2Status(d.spo2);
+  g('spo2Sub').textContent = spo2s ? spo2s.label : '—';
+  flashSet('activeCalCell', d.activeCal ? fmt(d.activeCal) : '—');
+  g('calSub').textContent = d.activeCal && ST.goals.activeCal.target ? `Hedef: ${fmt(ST.goals.activeCal.target)}` : '—';
+  flashSet('stepsCell', d.steps ? d.steps.toLocaleString('tr-TR') : '—');
+  g('stepsSub').textContent = d.steps && ST.goals.steps.target ? `Hedef: ${ST.goals.steps.target.toLocaleString('tr-TR')}` : '—';
+
+  // Calories
+  flashSet('bmrVal',       d.bmr       ? fmt(d.bmr)       : '—');
+  flashSet('activeCalVal', d.activeCal ? fmt(d.activeCal) : '—');
+  const total = d.bmr && d.activeCal ? Math.round(d.bmr + d.activeCal) : null;
+  flashSet('totalCalVal',  total ? total.toLocaleString('tr-TR') : '—');
+
+  // Wellness mini
+  if (d.wellScore != null) {
+    const circ   = 251;
+    const offset = circ - circ * (d.wellScore / 100);
+    g('wellRing').style.strokeDashoffset = offset;
+    flashSet('wellPct', d.wellScore);
+    const wl = wellLabel(d.wellScore);
+    g('wellLabel').textContent = wl.label;
+    g('wellDesc').textContent  = wl.desc;
+    g('wellLabel').style.color = wl.color;
+    g('wellRing').style.stroke  = wl.color;
+    g('wellPct').style.color    = wl.color;
+  }
+  g('sleepWm').textContent  = d.sleepScore  != null ? d.sleepScore + '%' : '—';
+  g('recovWm').textContent  = d.recovery    != null ? d.recovery   + '%' : '—';
+  g('stressWm').textContent = d.stressScore != null ? stressLabel(d.stressScore) : '—';
+
+  // Health tab
+  flashSet('hrMin',  d.hrMin  ?? '—');
+  flashSet('hrAvg',  d.hrAvg  ? fmt(d.hrAvg) : '—');
+  flashSet('hrRest', d.hrRest ?? '—');
+  flashSet('hrMax',  d.hrMax  ?? '—');
+
+  // SpO2
+  if (d.spo2 != null) {
+    flashSet('spo2Big', d.spo2);
+    const s = spo2Status(d.spo2);
+    g('spo2Status').textContent = s.label;
+    g('spo2Status').style.color = s.color;
+    g('spo2Ring').style.strokeDashoffset = 276 - 276 * (d.spo2 / 100);
+  }
+
+  // Steps & dist
+  flashSet('stepsBig', d.steps ? d.steps.toLocaleString('tr-TR') : '—');
+  flashSet('distBig',  d.dist  ? fmtD(d.dist)  : '—');
+  if (d.steps != null && ST.goals.steps.target) {
+    const pct = Math.min(d.steps / ST.goals.steps.target, 1);
+    g('stepsBar').style.width = (pct*100) + '%';
+    g('stepsProgTxt').textContent = `${d.steps.toLocaleString('tr-TR')} / ${ST.goals.steps.target.toLocaleString('tr-TR')}`;
+  }
+  g('cadEl').textContent  = d.cadence ?? '—';
+  g('paceEl').textContent = d.pace    ?? '—';
+  g('elevEl').textContent = d.elev    ?? '—';
+
+  // Weekly summary
+  if (d.weeklyActive.length) {
+    g('wActiveSum').textContent = d.weeklyActive.reduce((a,b)=>a+b,0).toLocaleString('tr-TR');
+    g('wWorkouts').textContent  = d.weeklyWorkouts;
+    g('wDistSum').textContent   = d.weeklyDist.toFixed(1);
+    g('wVo2').textContent       = d.vo2max ? 'VO₂ '+d.vo2max : '—';
+  }
+
+  // EOD report
+  g('eodTotal').textContent  = total  ? total.toLocaleString('tr-TR') + ' kcal' : '—';
+  g('eodBmr').textContent    = d.bmr        ? fmt(d.bmr) + ' kcal' : '—';
+  g('eodActive').textContent = d.activeCal  ? fmt(d.activeCal) + ' kcal' : '—';
+  g('eodSteps').textContent  = d.steps && d.dist ? `${d.steps.toLocaleString('tr-TR')} / ${fmtD(d.dist)} km` : '—';
+  g('eodHr').textContent     = d.hrAvg      ? fmt(d.hrAvg) + ' bpm' : '—';
+  g('eodSpo2').textContent   = d.spo2       ? d.spo2 + '%' : '—';
+  if (d.battery) g('batEl').textContent = '⌚ ' + d.battery + '%';
+}
+
+function renderTodayWorkouts() {
+  const list = g('todayWorkoutsList');
+  const ws   = ST.d.todayWorkouts;
+  if (!ws || ws.length === 0) {
+    list.innerHTML = `<div class="empty-state">
+      <div class="ei">⌚</div>
+      <div class="et">Henüz antrenman yok</div>
+      <div class="es">Suunto app'e antrenman kaydettiğinde burada otomatik görünür.</div>
+    </div>`;
+    return;
+  }
+  list.innerHTML = ws.map(w => {
+    const type   = WORKOUT_TYPES[w.sportTypeId] || WORKOUT_TYPES[w.sport] || '⚡ Aktivite';
+    const dur    = w.duration ? secsToDur(w.duration) : '—';
+    const dist   = w.distance ? (w.distance/1000).toFixed(2)+' km' : '';
+    const cal    = w.calories ? Math.round(w.calories) : '—';
+    const hrAvg  = w.hrAvg    ? w.hrAvg+' bpm ort.' : '';
+    const hrMax  = w.hrMax    ? '· Maks '+w.hrMax   : '';
+    const time   = w.startTime ? new Date(w.startTime).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}) : '';
+    const isNew  = w.activityId === ST.d.todayWorkouts[0]?.activityId;
+    return `<div class="workout-item">
+      <div class="wi-icon-wrap" style="background:rgba(255,62,108,0.1)">${type.split(' ')[0]}</div>
+      <div class="wi-info">
+        <div class="wi-name">${type.split(' ').slice(1).join(' ')} ${isNew ? '<span style="background:rgba(61,214,140,0.15);color:var(--c6);font-size:9px;font-weight:800;padding:2px 7px;border-radius:8px;margin-left:4px;letter-spacing:0.07em">YENİ</span>' : ''}</div>
+        <div class="wi-meta">${time}${dist ? ' · '+dist : ''}</div>
+      </div>
+      <div class="wi-stats">
+        <div class="wi-cal" style="color:var(--c2)">${cal} kcal</div>
+        <div class="wi-hr">${hrAvg} ${hrMax}</div>
+        <div class="wi-dur">${dur}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderZones() {
+  const ZONE_DEF = [
+    { name:'Z1 Dinlenme', color:'#4ECDC4', bpm:'< 114' },
+    { name:'Z2 Hafif',    color:'#45B7D1', bpm:'114–133' },
+    { name:'Z3 Aerobik',  color:'var(--c3)', bpm:'133–152' },
+    { name:'Z4 Eşik',     color:'#FF6B6B', bpm:'152–171' },
+    { name:'Z5 Maks.',    color:'var(--c2)', bpm:'> 171' },
+  ];
+  const total = ST.d.zones.reduce((a,b)=>a+b,0) || 1;
+  const maxZ  = Math.max(...ST.d.zones) || 1;
+  const toMin = s => ST.isDemo ? Math.round(s/40) : Math.round(s/60);
+  g('zonesEl').innerHTML = ZONE_DEF.map((z,i) => {
+    const s    = ST.d.zones[i] || 0;
+    const barW = Math.round((s/maxZ)*100);
+    const pct  = Math.round((s/total)*100);
+    const mins = toMin(s);
+    return `<div class="zr">
+      <span class="zr-name">${z.name}</span>
+      <div class="zr-track"><div class="zr-fill" style="width:${barW}%;background:${z.color}"></div></div>
+      <span class="zr-val">${mins}dk</span>
+      <span class="zr-val">${pct}%</span>
+    </div>`;
+  }).join('');
+}
+
+function renderWellnessRows() {
+  const d = ST.d;
+  const items = [
+    { icon:'😴', name:'Uyku Kalitesi',   val: d.sleepScore  != null ? d.sleepScore+'%'           : '—', color:'var(--c5)', sub:'Suunto Sleep Analysis' },
+    { icon:'🔄', name:'Toparlanma',       val: d.recovery    != null ? d.recovery+'%'              : '—', color:'var(--c4)', sub:'HRV tabanlı analiz' },
+    { icon:'😓', name:'Stres Seviyesi',   val: d.stressScore != null ? stressLabel(d.stressScore) : '—', color:'var(--c3)', sub:'Otonom sinir sistemi' },
+    { icon:'⚡', name:'Zindelik Skoru',   val: d.wellScore   != null ? d.wellScore+'%'             : '—', color:'var(--c5)', sub:'Bileşik puan' },
+    { icon:'🫀', name:'VO₂ Maks',         val: d.vo2max      != null ? d.vo2max+' mL/kg'           : '—', color:'var(--c2)', sub:'Suunto tahmini' },
+    { icon:'❤️', name:'Dinlenme Nabzı',   val: d.hrRest      != null ? d.hrRest+' bpm'             : '—', color:'var(--c2)', sub:'Gece ölçümü' },
+  ];
+  g('wellRowsEl').innerHTML = items.map(w => `
+    <div class="well-row">
+      <div class="wr-l">
+        <span class="wr-icon">${w.icon}</span>
+        <div><div class="wr-name">${w.name}</div><div class="wr-sub">${w.sub}</div></div>
+      </div>
+      <div class="wr-val" style="color:${w.color}">${w.val}</div>
+    </div>`).join('');
+}
+
+function renderWeeklyChart() {
+  const actData = ST.d.weeklyActive.length ? ST.d.weeklyActive : Array(7).fill(0);
+  const bmrData = ST.d.weeklyBmr.length    ? ST.d.weeklyBmr    : Array(7).fill(ST.d.bmr||1800);
+  const days    = ['Pzt','Sal','Çar','Per','Cum','Cmt','Paz'];
+  const todayI  = ((new Date().getDay()+6)%7);
+  const maxVal  = Math.max(...actData.map((a,i) => a+bmrData[i]), 1);
+  g('wchartEl').innerHTML = days.map((d,i) => {
+    const ah = Math.round((actData[i]/maxVal)*100);
+    const bh = Math.round((bmrData[i]/maxVal)*36);
+    const today = i === todayI;
+    return `<div class="wday">
+      <div class="wbars" style="height:${ah+bh}px">
+        <div class="wbar" style="height:${ah}px;background:${today?'var(--c3)':'rgba(255,173,31,0.38)'};flex-shrink:0"></div>
+        <div class="wbar" style="height:${bh}px;background:${today?'var(--c1)':'rgba(0,255,204,0.25)'};flex-shrink:0"></div>
+      </div>
+      <span class="wdl${today?' today':''}">${d}</span>
+    </div>`;
+  }).join('');
+}
+
+function renderGoals() {
+  renderGoalList('dailyGoalsEl',  ST.goals);
+  renderGoalList('weeklyGoalsEl', ST.weeklyGoals);
+}
+
+function renderGoalList(id, goals) {
+  const C = 151;
+  g(id).innerHTML = Object.entries(goals).map(([key, gl]) => {
+    const pct    = Math.min((gl.current||0)/gl.target, 1);
+    const offset = (C - C*pct).toFixed(1);
+    const done   = pct >= 1;
+    const fmt    = v => (typeof v === 'number' && v > 999) ? v.toLocaleString('tr-TR') : v;
+    return `<div class="goal-item">
+      <div class="gmr">
+        <svg width="52" height="52" viewBox="0 0 52 52" style="transform:rotate(-90deg)">
+          <circle cx="26" cy="26" r="22" fill="none" stroke="${gl.color}" stroke-width="5" opacity="0.15"/>
+          <circle cx="26" cy="26" r="22" fill="none" stroke="${gl.color}" stroke-width="5"
+            stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${offset}"/>
+        </svg>
+        <div class="gmr-c" style="color:${gl.color}">${done?'✓':Math.round(pct*100)+'%'}</div>
+      </div>
+      <div class="gb">
+        <div class="g-name">${gl.icon} ${gl.label}</div>
+        <div class="g-prog">${fmt(gl.current??0)} / ${fmt(gl.target)} ${gl.unit}</div>
+        <div class="g-streak">🔥 ${gl.streak} gün serisi</div>
+      </div>
+      <div class="g-edit" onclick="openGoalModal('${key}','${id.includes('weekly')?'weeklyGoals':'goals'}')">✎</div>
+    </div>`;
+  }).join('');
+}
+
+/* ════════════════════════════════════════════
+   HELPERS
+════════════════════════════════════════════ */
+function buildWeekArr(workouts, field, days, fallback=0) {
+  return [...Array(days)].map((_,i) => {
+    const d = new Date(Date.now()-(days-1-i)*864e5).toISOString().split('T')[0];
+    const ws= workouts.filter(w => w.startTime?.startsWith(d));
+    const sum = ws.reduce((s,w) => s+(w[field]||0), 0);
+    return sum || (i === days-1 ? fallback : Math.floor(300+Math.random()*400));
+  });
+}
+
+function secsToDur(s) {
+  const h = Math.floor(s/3600), m = Math.floor((s%3600)/60), sc=s%60;
+  return h>0 ? `${h}s ${String(m).padStart(2,'0')}dk` : `${m}dk ${String(sc).padStart(2,'0')}s`;
+}
+
+function secsToPace(s) {
+  if (!s) return '—';
+  const m = Math.floor(s/60), sc = s%60;
+  return `${m}:${String(sc).padStart(2,'0')}`;
+}
+
+function estimateBMR() { return 1820; } // fallback
+
+function spo2Status(v) {
+  if (v == null) return null;
+  if (v >= 97) return { label:'Normal ✓', color:'var(--c6)' };
+  if (v >= 94) return { label:'Kabul Edilebilir', color:'var(--c3)' };
+  return { label:'Düşük ⚠', color:'var(--c2)' };
+}
+
+function stressLabel(v) {
+  if (v == null) return '—';
+  if (v < 26) return 'Düşük';
+  if (v < 51) return 'Orta';
+  if (v < 76) return 'Yüksek';
+  return 'Çok Yüksek';
+}
+
+function wellLabel(pct) {
+  if (pct >= 80) return { label:'Mükemmel 🔥', desc:'Tam performans için hazırsın!', color:'var(--c6)' };
+  if (pct >= 60) return { label:'İyi ✓',       desc:'Antrenman için vücudun hazır.', color:'var(--c5)' };
+  if (pct >= 40) return { label:'Orta',         desc:'Hafif antrenman önerilir.',     color:'var(--c3)' };
+  return              { label:'Yorgun',          desc:'Bugün dinlenmen önerilir.',     color:'var(--c2)' };
+}
+
+function flashSet(id, val) {
+  const el = g(id);
+  if (!el || el.textContent === String(val)) return;
+  el.textContent = val;
+  el.classList.remove('v-flash');
+  void el.offsetWidth;
+  el.classList.add('v-flash');
+}
+
+/* ════════════════════════════════════════════
+   TABS / MODAL / TOAST / PILL
+════════════════════════════════════════════ */
+function goTab(id, btn) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  g('panel-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+function openGoalModal(key, group) {
+  ST.editKey=key; ST.editGroup=group;
+  const gl = ST[group][key];
+  g('modalTitleEl').textContent = gl.label + ' Hedefini Düzenle';
+  g('modalLblEl').textContent   = `Hedef (${gl.unit})`;
+  g('modalInputEl').value       = gl.target;
+  g('goalModal').classList.add('open');
+}
+function modalTap(e){ if(e.target===g('goalModal')) g('goalModal').classList.remove('open'); }
+function saveGoal(){
+  const v=parseFloat(g('modalInputEl').value);
+  if(!isNaN(v)&&v>0){ ST[ST.editGroup][ST.editKey].target=v; renderGoals(); g('goalModal').classList.remove('open'); toast('✓ Hedef güncellendi'); }
+}
+
+function setSyncPill(state, txt) {
+  const p = g('syncPill');
+  p.className = 'sync-pill sync-'+state;
+  g('syncTxt').textContent = txt;
+}
+
+let _toastTimer;
+function toast(msg) {
+  const t = g('toastEl');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+
+function g(id){ return document.getElementById(id); }
+
+/* ════════════════════════════════════════════
+   BOOT
+════════════════════════════════════════════ */
+window.addEventListener('DOMContentLoaded', () => {
+  tickClock();
+  setInterval(tickClock, 1000);
+
+  // OAuth redirect callback?
+  const params = new URLSearchParams(location.search);
+  const code   = params.get('code');
+  if (code) {
+    g('setup').style.display='none';
+    g('app').style.opacity='1';
+    exchangeCode(code);
+    return;
+  }
+
+  // Saved token → auto-login
+  const saved = localStorage.getItem('sv_token');
+  if (saved) {
+    ST.token = saved;
+    launchApp();
+    fetchAll();
+    startPolling();
+  }
+});
+</script>
+</body>
+</html>
